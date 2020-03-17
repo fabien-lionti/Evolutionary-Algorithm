@@ -2,12 +2,14 @@ import numpy as np
 
 class particle:
 
-    def __init__(self, **parameters_range):
+    def __init__(self, fitness_function, **parameters_range):
         self.parameters = parameters_range
+        self.fitness_function = fitness_function
         self.position = self.init_position()
+        self.fitness = self.fitness_function(self.position)
         self.best_position = self.position
-        self.fitness = None
-        self.velocity = None
+        self.global_best_position = None
+        self.velocity = 0
         return
 
     def init_position(self):
@@ -18,29 +20,30 @@ class particle:
             min = self.parameters[i[1]][0]
             max = self.parameters[i[1]][1]
             position[i[0]] = np.random.uniform(min, max)
+        #print("Position : "+str(position))
         return position
 
-    def update_best_position(self, p_best):
-        if p_best < self.best_position:
-            self.best_position = p_best
-            return
+    def update_best_position(self):
+        new_fitness = self.fitness_function(self.position)
+        if self.fitness > new_fitness:
+            self.best_position = self.position
+        self.fitness = new_fitness
+        return
 
-        #  v[] = v[] + c1 * rand() * (pbest[] - present[]) + c2 * rand() * (gbest[] - present[]) (a)
-        # present[] = persent[] + v[] (b)
-    def update_position(self, c1, c2, g_best):
+    def update_position(self, c1, c2):
         rand1 = np.random.uniform(0, 1)
         rand2 = np.random.uniform(0, 1)
-        self.update_best_position()
         self.velocity = self.velocity + c1 * rand1 * (self.best_position - self.position) \
-                        + c2 * rand2 * (g_best - self.position)
+                        + c2 * rand2 * (self.global_best_position - self.position)
         self.position = self.position + self.velocity
+        self.update_best_position()
         return
 
     def get_position(self):
         return self.position
 
-    def set_fitness(self,fitness):
-        self.fitness = fitness
+    def set_global_best_position(self, g_best):
+        self.global_best_position = g_best
 
 class PSO :
 
@@ -50,35 +53,56 @@ class PSO :
         self.nb_iteration = nb_iteration
         self.nb_particles = nb_particle
         self.parameters_range = parameters_range
-        self.particles = self.init_particle(**parameters_range)
         self.fitness_function = fitness_function
+        self.particles = self.init_particle(**parameters_range)
         self.g_best_index = None
-        self.score = None
+        self.fitness = None
         return
 
     def init_particle(self, **parameters_range):
-        return [particle(**parameters_range) for i in range(self.nb_particles)]
+        return [particle(self.fitness_function,**parameters_range) for i in range(self.nb_particles)]
 
-    def update_fitness(self):
-        self.score = np.array([self.fitness_function(self.particles[i].get_position()) for i in range(self.nb_particles)])
-        for i in range(self.nb_particles) : self.particles[i].set_fitness(self.score[i])
+    def update_global_best_position(self):
+        fitness = [self.particles[i].fitness for i in range(self.nb_particles)]
+        self.g_best_index = np.argmin(fitness)
         return
 
-    def update_global_best(self):
-        self.g_best_index = np.argmax(self.score)
+    def set_global_best_position(self):
+        self.update_global_best_position()                                      # Find index of the fittest particle
+        global_best_position = self.particles[self.g_best_index].get_position() # Give the best position among swarm
+        for i in range(self.nb_particles):                                      # Set for each particle the best
+            self.particles[i].set_global_best_position(global_best_position)    # position found by the swarm
+        return
+
+    def update_particle_position(self):
+        for i in range(self.nb_particles):
+            self.particles[i].update_position(self.c1, self.c2)
         return
 
     def fit(self):
+        res = {}
         for i in range(self.nb_iteration):
-            self.update_fitness()
-            self.update_global_best()
-            global_best_position = self.particles[self.g_best_index].get_position()
-            self.particles[i].update_position(self.c1, self.c2, global_best_position, )
-        return
+            self.set_global_best_position()
+            self.update_particle_position()
+            self.update_global_best_position()
+        for i in enumerate(self.parameters_range.keys()):
+           res[i[1]] = self.particles[self.g_best_index].get_position()[i[0]]
+        return res
+
+        #for j in range(self.nb_particles):
+        #    print("j :" + str(j) +" : " + str(self.particles[j].fitness))
+        #print("best index"+str(self.g_best_index))
+
 
 def fitness(variables):
     x = variables[0]
-    return x**2
+    y = variables[1]
+    return x**4+y**8
 
-pso = PSO(fitness_function = fitness ,c1 = 1,c2 = 1, nb_iteration = 1,nb_particle = 10, sigma = (10,15))
-pso.update_global_best()
+pso = PSO(fitness_function = fitness, c1 = 1, c2 = 1, nb_iteration = 10, nb_particle = 1000, sigma = (-100,100), beta = (-100,100))
+res = pso.fit()
+print(res)
+
+
+
+
