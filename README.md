@@ -1,10 +1,11 @@
 # Evolutionary-Algorithm
-Evolutionary algorithm library
+Particle Swarm Optimization Script :
 
-Test code : 
+Quick Start : 
 
 ```python
 def fitness(variables):
+    """ define function to evaluate fitness """
     x = variables[0]
     return x**4
 
